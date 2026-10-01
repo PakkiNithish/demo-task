@@ -25,9 +25,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Step 3: Pre-cache embedding and EasyOCR models during build so container runs instantly
+# Step 3: Pre-cache embedding model and EasyOCR base detector during build
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')" && \
-    python -c "import easyocr; easyocr.Reader(['hi', 'en'], gpu=False); easyocr.Reader(['te', 'en'], gpu=False); easyocr.Reader(['ta', 'en'], gpu=False)"
+    python -c "import easyocr; easyocr.Reader(['en'], gpu=False)"
 
 # Step 4: Copy application source code
 COPY . .
