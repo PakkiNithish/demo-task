@@ -1,23 +1,27 @@
-from sentence_transformers import SentenceTransformer
-
-
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 _model = None
 
 
 def get_model():
-    """Lazy load embedding model to save RAM and avoid startup timeouts."""
+    """Lazy load embedding model. Uses FastEmbed (ONNX) for ultra-low memory, fallback to SentenceTransformer."""
     global _model
     if _model is None:
-        _model = SentenceTransformer(MODEL_NAME)
+        try:
+            from fastembed import TextEmbedding
+            _model = ("fastembed", TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2"))
+        except ImportError:
+            from sentence_transformers import SentenceTransformer
+            _model = ("st", SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2"))
     return _model
 
 
 def create_embeddings(texts: list[str]) -> list[list[float]]:
-    model = get_model()
-    embeddings = model.encode(
-        texts,
-        normalize_embeddings=True
-    )
+    if not texts:
+        return []
 
-    return embeddings.tolist()
+    model_type, model = get_model()
+    if model_type == "fastembed":
+        embeddings = list(model.embed(texts))
+        return [e.tolist() for e in embeddings]
+    else:
+        embeddings = model.encode(texts, normalize_embeddings=True)
+        return embeddings.tolist()
