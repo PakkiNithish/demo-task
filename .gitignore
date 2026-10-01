@@ -1,0 +1,22 @@
+# Environment variables
+.env
+.env.local
+*.env
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Node dependencies and build
+node_modules/
+dist/
+
+# Python environments and cache
+backend/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Temporary test/sample files
+backend/sample.pdf

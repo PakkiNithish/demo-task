@@ -68,12 +68,16 @@ async def translate_text(
     try:
         # 3. Detect language
         detected_language = detect_language(source_content)
+        print(f"[TRANSLATE] source_content length: {len(source_content)}")
+        print(f"[TRANSLATE] source_content preview: {repr(source_content[:300])}")
+        print(f"[TRANSLATE] detected_language: {detected_language}")
 
         # 4. Translate to English
         translation = translate_to_english(
             source_content,
             detected_language
         )
+        print(f"[TRANSLATE] raw translation: {repr(translation)}")
 
         if not translation:
             translation = "Translation could not be generated for this input."

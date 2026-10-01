@@ -1,7 +1,7 @@
 import type { RetrievalResponse, TranslationResponse } from "../types";
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+  import.meta.env.VITE_API_BASE_URL || "";
 
 export const RETRIEVAL_ENDPOINT = `${API_BASE_URL}/api/retrieval/ask`;
 export const TRANSLATION_ENDPOINT = `${API_BASE_URL}/api/translation/translate`;
