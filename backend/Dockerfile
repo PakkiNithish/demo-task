@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Step 1: Install lightweight CPU-only PyTorch first (only ~160MB, avoids 3GB CUDA download)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
 # Step 2: Install remaining application dependencies
 COPY requirements.txt .

@@ -78,22 +78,6 @@ def _extract_from_doc(file_path: str) -> str:
     return ""
 
 
-_easyocr_reader = None
-
-
-def _get_ocr_reader():
-    """Lazy initialize EasyOCR reader with Devanagari and Latin script support."""
-    global _easyocr_reader
-    if _easyocr_reader is None:
-        try:
-            import easyocr
-            _easyocr_reader = easyocr.Reader(['hi', 'en'], gpu=False, verbose=False)
-        except Exception as e:
-            print(f"Failed to initialize EasyOCR: {e}")
-            _easyocr_reader = None
-    return _easyocr_reader
-
-
 def _is_quality_text(text: str) -> bool:
     """
     Check if the extracted text contains meaningful readable characters
@@ -119,18 +103,49 @@ def _is_quality_text(text: str) -> bool:
 
 
 def _ocr_page(page) -> str:
-    """Render PDF page to image and perform OCR extraction."""
-    reader = _get_ocr_reader()
-    if not reader:
+    """Render PDF page to image and perform OCR using Groq Vision (zero RAM footprint on free tier)."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
         return ""
     try:
+        import base64
+        from groq import Groq
         pix = page.get_pixmap(dpi=150)
-        img_bytes = pix.tobytes("png")
-        lines = reader.readtext(img_bytes, detail=0)
-        return "\n".join(lines).strip()
+        img_bytes = pix.tobytes("jpeg")
+        base64_image = base64.b64encode(img_bytes).decode("utf-8")
+
+        client = Groq(api_key=api_key)
+        response = client.chat.completions.create(
+            model="llama-3.2-11b-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Transcribe all readable text from this document image exactly as written. "
+                                "Preserve the original language (Hindi/Devanagari, regional script, or English). "
+                                "Return only the extracted text without introductory or concluding remarks."
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}",
+                            },
+                        },
+                    ],
+                }
+            ],
+            temperature=0.1,
+            max_tokens=2048,
+        )
+        if response.choices and response.choices[0].message.content:
+            return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"OCR error on page: {e}")
-        return ""
+        print(f"Vision OCR fallback error: {e}")
+    return ""
 
 
 def _extract_from_pdf(file_path: str) -> str:
