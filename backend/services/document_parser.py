@@ -78,28 +78,41 @@ def _extract_from_doc(file_path: str) -> str:
     return ""
 
 
-def _is_quality_text(text: str) -> bool:
+def _should_run_ocr(text: str, filename: str = "") -> bool:
     """
-    Check if the extracted text contains meaningful readable characters
-    rather than just punctuation, numbers, spaces, or watermark artifacts.
+    Check if a PDF page requires Vision OCR extraction.
+    Triggers OCR when:
+    1. Text is empty or very sparse (< 60 words on a full page).
+    2. Document is an Indian regional document (filename contains hindi/telugu/etc. or regional sample)
+       but extracted text contains 0 Indic characters (only English watermarks like 'India Code').
+    3. Extracted text has low density of clean letters to symbols.
     """
     if not text or not text.strip():
-        return False
+        return True
 
-    # Find all alphabetic and regional script letters (Devanagari, Bengali, Telugu, Tamil, Kannada, etc.)
-    letters = re.findall(r'[\u0900-\u0D7F\w]', text)
-    clean_letters = [c for c in letters if not c.isdigit() and c != '_']
+    words = re.findall(r'\b[^\W\d_]{2,}\b', text)
+    indic_letters = re.findall(r'[\u0900-\u0D7F]', text)
 
-    # If fewer than 25 real alphabetic letters
-    if len(clean_letters) < 25:
-        return False
+    fname_lower = filename.lower()
+    is_regional_named = any(k in fname_lower for k in [
+        "hindi", "telugu", "tamil", "kannada", "marathi", "bengali", "gujarati", "malayalam", "punjabi", "regional", "sample"
+    ])
 
-    # Ratio of real letters to non-whitespace characters
-    non_space_chars = len(re.sub(r'\s+', '', text))
-    if non_space_chars > 0 and (len(clean_letters) / non_space_chars) < 0.25:
-        return False
+    # Case A: If regional filename or hint, but PyMuPDF found NO Indic characters (watermark only)
+    if is_regional_named and len(indic_letters) < 15:
+        return True
 
-    return True
+    # Case B: If total words on page is very low (< 60 words) - typical of watermarked scanned pages (e.g. India Code)
+    if len(words) < 60:
+        return True
+
+    # Case C: Ratio of real letters to non-whitespace characters is low
+    clean_letters = [c for c in re.findall(r'[\u0900-\u0D7F\w]', text) if not c.isdigit() and c != '_']
+    non_space = len(re.sub(r'\s+', '', text))
+    if non_space > 0 and (len(clean_letters) / non_space) < 0.35:
+        return True
+
+    return False
 
 
 def _ocr_page(page) -> str:
@@ -148,7 +161,7 @@ def _ocr_page(page) -> str:
     return ""
 
 
-def _extract_from_pdf(file_path: str) -> str:
+def _extract_from_pdf(file_path: str, filename: str = "") -> str:
     """Extract text from PDF using PyMuPDF, falling back to OCR if text is corrupted or scanned."""
     document = pymupdf.open(file_path)
     if document.is_encrypted:
@@ -170,11 +183,13 @@ def _extract_from_pdf(file_path: str) -> str:
         # Clean null characters and excessive whitespace
         text = text.replace("\x00", "").strip()
 
-        # 3. Fallback to OCR if extracted text is missing or corrupted
-        if not _is_quality_text(text):
+        # 3. Fallback to Vision OCR if extracted text is missing, sparse, or missing regional script
+        if _should_run_ocr(text, filename):
             ocr_text = _ocr_page(page)
             if ocr_text:
-                text = ocr_text
+                has_indic = any('\u0900' <= c <= '\u0D7F' for c in ocr_text)
+                if has_indic or len(ocr_text.strip()) > len(text.strip()):
+                    text = ocr_text
 
         if text:
             pages_text.append(text)
@@ -209,7 +224,7 @@ def extract_text_from_file(file_path: str, original_filename: str = "") -> str:
     # 1. Handle PDF
     if is_pdf:
         try:
-            text = _extract_from_pdf(file_path)
+            text = _extract_from_pdf(file_path, filename)
             if text.strip():
                 return text.strip()
         except Exception:
