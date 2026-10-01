@@ -65,24 +65,36 @@ async def translate_text(
             detail="Please provide text or upload a document (.pdf, .doc, .docx) to translate."
         )
 
-    # 3. Detect language
-    detected_language = detect_language(source_content)
+    try:
+        # 3. Detect language
+        detected_language = detect_language(source_content)
 
-    # 4. Translate to English
-    translation = translate_to_english(
-        source_content,
-        detected_language
-    )
+        # 4. Translate to English
+        translation = translate_to_english(
+            source_content,
+            detected_language
+        )
 
-    # 5. Calculate semantic similarity
-    similarity_score = calculate_semantic_similarity(
-        source_content,
-        translation
-    )
+        if not translation:
+            translation = "Translation could not be generated for this input."
 
-    return {
-        "source_text": source_content,
-        "detected_language": detected_language,
-        "translation": translation,
-        "semantic_similarity": similarity_score
-    }
+        # 5. Calculate semantic similarity
+        similarity_score = calculate_semantic_similarity(
+            source_content,
+            translation
+        )
+
+        return {
+            "source_text": source_content,
+            "detected_language": detected_language,
+            "translation": translation,
+            "semantic_similarity": similarity_score
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Translation error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Translation failed: {str(e)}"
+        )
